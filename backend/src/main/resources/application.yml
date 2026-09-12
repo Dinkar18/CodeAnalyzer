@@ -34,11 +34,6 @@ spring:
     out-of-order: true
     locations: classpath:db/migration
 
-  data:
-    redis:
-      host: ${SPRING_DATA_REDIS_HOST:localhost}
-      port: ${SPRING_DATA_REDIS_PORT:6379}
-      timeout: 2000ms
 
   mail:
     host: ${SPRING_MAIL_HOST:localhost}
