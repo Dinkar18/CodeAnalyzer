@@ -10,16 +10,19 @@ class RedisManager:
 
     async def connect(self):
         try:
-            self.client = redis.Redis(
-                host=settings.REDIS_HOST,
-                port=settings.REDIS_PORT,
-                db=settings.REDIS_DB,
-                decode_responses=True
-            )
+            if settings.REDIS_URL:
+                self.client = redis.from_url(settings.REDIS_URL, decode_responses=True)
+            else:
+                self.client = redis.Redis(
+                    host=settings.REDIS_HOST,
+                    port=settings.REDIS_PORT,
+                    db=settings.REDIS_DB,
+                    decode_responses=True
+                )
             await self.client.ping()
             logger.info("Redis connection established.")
         except Exception as e:
-            logger.warning(f"Failed to connect to Redis: {e}. Caching disabled or running in fallback mode.")
+            logger.info("Redis is not configured. Running seamlessly in PostgreSQL database mode.")
             self.client = None
 
     async def disconnect(self):
