@@ -63,6 +63,26 @@ services:
         fromDatabase:
           name: aicodebase-db
           property: connectionString
+      - key: POSTGRES_HOST
+        fromDatabase:
+          name: aicodebase-db
+          property: host
+      - key: POSTGRES_PORT
+        fromDatabase:
+          name: aicodebase-db
+          property: port
+      - key: POSTGRES_DB
+        fromDatabase:
+          name: aicodebase-db
+          property: database
+      - key: POSTGRES_USER
+        fromDatabase:
+          name: aicodebase-db
+          property: user
+      - key: POSTGRES_PASSWORD
+        fromDatabase:
+          name: aicodebase-db
+          property: password
 
   # ============================================================================
   # 3. React Vite Frontend Static Site (Global CDN)

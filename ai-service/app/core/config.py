@@ -9,14 +9,19 @@ class Settings(BaseSettings):
     DEBUG: bool = False
 
     # Database (PostgreSQL + pgvector)
+    DATABASE_URL: Optional[str] = None
     POSTGRES_HOST: str = "localhost"
     POSTGRES_PORT: int = 5432
     POSTGRES_DB: str = "aicodebase"
     POSTGRES_USER: str = "postgres"
     POSTGRES_PASSWORD: str = "postgres"
 
-    @property
-    def DATABASE_URL(self) -> str:
+    def get_database_url(self) -> str:
+        if self.DATABASE_URL:
+            url = self.DATABASE_URL
+            if url.startswith("postgres://"):
+                url = "postgresql://" + url[len("postgres://"):]
+            return url
         return f"postgresql://{self.POSTGRES_USER}:{self.POSTGRES_PASSWORD}@{self.POSTGRES_HOST}:{self.POSTGRES_PORT}/{self.POSTGRES_DB}"
 
     # Redis

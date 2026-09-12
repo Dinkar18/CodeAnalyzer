@@ -11,20 +11,17 @@ class DatabasePool:
 
     async def connect(self):
         try:
+            dsn = settings.get_database_url()
             self.pool = await asyncpg.create_pool(
-                host=settings.POSTGRES_HOST,
-                port=settings.POSTGRES_PORT,
-                user=settings.POSTGRES_USER,
-                password=settings.POSTGRES_PASSWORD,
-                database=settings.POSTGRES_DB,
+                dsn=dsn,
                 min_size=2,
                 max_size=20,
                 init=self._init_connection
             )
             logger.info("PostgreSQL database connection pool established.")
         except Exception as e:
-            logger.error(f"Failed to connect to database: {e}")
-            raise e
+            logger.error(f"Failed to connect to database at {settings.get_database_url()}: {e}")
+            self.pool = None
 
     async def _init_connection(self, conn: asyncpg.Connection):
         await register_vector(conn)
@@ -36,7 +33,9 @@ class DatabasePool:
 
     async def get_connection(self) -> asyncpg.Connection:
         if not self.pool:
-            raise RuntimeError("Database pool not initialized. Call connect() first.")
+            await self.connect()
+        if not self.pool:
+            raise RuntimeError("Database pool not initialized. Unable to connect to PostgreSQL.")
         return await self.pool.acquire()
 
     async def release_connection(self, conn: asyncpg.Connection):
