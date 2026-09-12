@@ -3,7 +3,7 @@
  * Prevents typos, avoids magic strings, and ensures single source of truth for REST routes.
  */
 
-const rawApiUrl = import.meta.env.VITE_API_URL || '';
+const rawApiUrl = import.meta.env.VITE_API_URL || (typeof window !== 'undefined' && window.location.hostname !== 'localhost' && !window.location.hostname.includes('127.0.0.1') ? 'https://aicodebase-backend.onrender.com' : '');
 export const API_BASE_URL = rawApiUrl ? `${rawApiUrl.replace(/\/+$/, '')}/api` : '/api';
 
 export const API_ENDPOINTS = {
