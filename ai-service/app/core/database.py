@@ -24,7 +24,11 @@ class DatabasePool:
             self.pool = None
 
     async def _init_connection(self, conn: asyncpg.Connection):
-        await register_vector(conn)
+        try:
+            await conn.execute("CREATE EXTENSION IF NOT EXISTS vector;")
+            await register_vector(conn)
+        except Exception as e:
+            logger.warning(f"Could not initialize pgvector extension: {e}")
 
     async def disconnect(self):
         if self.pool:
