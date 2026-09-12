@@ -2,11 +2,16 @@ package com.aicodebase.architect;
 
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
-import org.springframework.cache.annotation.EnableCaching;
+import org.springframework.boot.autoconfigure.data.redis.RedisAutoConfiguration;
+import org.springframework.boot.autoconfigure.data.redis.RedisRepositoriesAutoConfiguration;
+import org.springframework.data.jpa.repository.config.EnableJpaRepositories;
 import org.springframework.scheduling.annotation.EnableAsync;
 
-@SpringBootApplication
-@EnableCaching
+@SpringBootApplication(exclude = {
+    RedisAutoConfiguration.class,
+    RedisRepositoriesAutoConfiguration.class
+})
+@EnableJpaRepositories(basePackages = "com.aicodebase.architect.repository")
 @EnableAsync
 public class AiCodebaseArchitectApplication {
 
