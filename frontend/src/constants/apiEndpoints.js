@@ -3,7 +3,8 @@
  * Prevents typos, avoids magic strings, and ensures single source of truth for REST routes.
  */
 
-export const API_BASE_URL = '/api';
+const rawApiUrl = import.meta.env.VITE_API_URL || '';
+export const API_BASE_URL = rawApiUrl ? `${rawApiUrl.replace(/\/+$/, '')}/api` : '/api';
 
 export const API_ENDPOINTS = {
   // Auth
