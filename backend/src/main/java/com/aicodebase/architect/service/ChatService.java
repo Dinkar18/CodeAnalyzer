@@ -19,6 +19,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 import reactor.core.publisher.Flux;
 
@@ -91,34 +92,16 @@ public class ChatService {
         conversationJpaRepository.delete(entity);
     }
 
-    @Transactional
+    // NON-TRANSACTIONAL orchestrator: avoids locking DB connections while waiting for slow LLM HTTP responses
     public ChatResponseDto sendMessage(ChatRequestDto request) {
         UserEntity currentUser = currentUserService.getCurrentUserOrThrow();
-        RepositoryEntity repo = repositoryJpaRepository.findById(request.repositoryId())
-            .orElseThrow(() -> new ResourceNotFoundException("Repository not found with ID: " + request.repositoryId()));
+        UUID convId = prepareConversationAndPersistUserMsg(request.repositoryId(), request.conversationId(), request.message(), currentUser);
 
-        ConversationEntity conversation;
-        if (request.conversationId() != null) {
-            conversation = conversationJpaRepository.findByIdAndUserId(request.conversationId(), currentUser.getId())
-                .orElseGet(() -> createNewConversation(repo, request.message(), currentUser));
-        } else {
-            conversation = createNewConversation(repo, request.message(), currentUser);
-        }
-
-        // Persist User Message
-        MessageEntity userMsg = MessageEntity.builder()
-            .conversation(conversation)
-            .role(AppConstants.ROLE_USER)
-            .content(request.message())
-            .evidence(List.of())
-            .build();
-        messageJpaRepository.save(userMsg);
-
-        // Forward to AI Service
+        // Forward to AI Service (Connection is FREE and released back to pool!)
         ChatRequestDto enrichedRequest = new ChatRequestDto(
             request.repositoryId(),
             request.message(),
-            conversation.getId(),
+            convId,
             request.provider() != null ? request.provider() : AppConstants.DEFAULT_PROVIDER,
             request.customApiKey(),
             request.customModel(),
@@ -127,50 +110,26 @@ public class ChatService {
 
         ChatResponseDto aiResponse = aiServiceClient.chat(enrichedRequest);
 
-        // Persist Assistant Message
-        MessageEntity assistantMsg = MessageEntity.builder()
-            .conversation(conversation)
-            .role(AppConstants.ROLE_ASSISTANT)
-            .content(aiResponse.response())
-            .evidence(aiResponse.evidence() != null ? aiResponse.evidence() : List.of())
-            .build();
-        messageJpaRepository.save(assistantMsg);
+        // Persist Assistant Message in isolated transaction
+        persistAssistantMessage(convId, aiResponse.response(), aiResponse.evidence());
 
         return new ChatResponseDto(
-            conversation.getId(),
+            convId,
             aiResponse.response(),
             aiResponse.evidence(),
             aiResponse.providerUsed()
         );
     }
 
-    @Transactional
+    // NON-TRANSACTIONAL stream orchestrator
     public Flux<String> streamMessage(ChatRequestDto request) {
         UserEntity currentUser = currentUserService.getCurrentUserOrThrow();
-        RepositoryEntity repo = repositoryJpaRepository.findById(request.repositoryId())
-            .orElseThrow(() -> new ResourceNotFoundException("Repository not found with ID: " + request.repositoryId()));
-
-        ConversationEntity conversation;
-        if (request.conversationId() != null) {
-            conversation = conversationJpaRepository.findByIdAndUserId(request.conversationId(), currentUser.getId())
-                .orElseGet(() -> createNewConversation(repo, request.message(), currentUser));
-        } else {
-            conversation = createNewConversation(repo, request.message(), currentUser);
-        }
-
-        // Persist User Message
-        MessageEntity userMsg = MessageEntity.builder()
-            .conversation(conversation)
-            .role(AppConstants.ROLE_USER)
-            .content(request.message())
-            .evidence(List.of())
-            .build();
-        messageJpaRepository.save(userMsg);
+        UUID convId = prepareConversationAndPersistUserMsg(request.repositoryId(), request.conversationId(), request.message(), currentUser);
 
         ChatRequestDto enrichedRequest = new ChatRequestDto(
             request.repositoryId(),
             request.message(),
-            conversation.getId(),
+            convId,
             request.provider() != null ? request.provider() : AppConstants.DEFAULT_PROVIDER,
             request.customApiKey(),
             request.customModel(),
@@ -178,7 +137,6 @@ public class ChatService {
         );
 
         StringBuilder assistantContent = new StringBuilder();
-        UUID convId = conversation.getId();
 
         return aiServiceClient.streamChat(enrichedRequest)
             .doOnNext(sseChunk -> {
@@ -202,20 +160,50 @@ public class ChatService {
                 try {
                     String fullResponse = assistantContent.toString();
                     if (!fullResponse.isBlank()) {
-                        conversationJpaRepository.findById(convId).ifPresent(c -> {
-                            MessageEntity assistantMsg = MessageEntity.builder()
-                                .conversation(c)
-                                .role(AppConstants.ROLE_ASSISTANT)
-                                .content(fullResponse)
-                                .evidence(List.of())
-                                .build();
-                            messageJpaRepository.save(assistantMsg);
-                        });
+                        persistAssistantMessage(convId, fullResponse, List.of());
                     }
                 } catch (Exception e) {
                     log.warn("Failed to persist assistant stream message: {}", e.getMessage());
                 }
             });
+    }
+
+    @Transactional
+    public UUID prepareConversationAndPersistUserMsg(UUID repositoryId, UUID conversationId, String message, UserEntity currentUser) {
+        RepositoryEntity repo = repositoryJpaRepository.findById(repositoryId)
+            .orElseThrow(() -> new ResourceNotFoundException("Repository not found with ID: " + repositoryId));
+
+        ConversationEntity conversation;
+        if (conversationId != null) {
+            conversation = conversationJpaRepository.findByIdAndUserId(conversationId, currentUser.getId())
+                .orElseGet(() -> createNewConversation(repo, message, currentUser));
+        } else {
+            conversation = createNewConversation(repo, message, currentUser);
+        }
+
+        // Persist User Message
+        MessageEntity userMsg = MessageEntity.builder()
+            .conversation(conversation)
+            .role(AppConstants.ROLE_USER)
+            .content(message)
+            .evidence(List.of())
+            .build();
+        messageJpaRepository.save(userMsg);
+
+        return conversation.getId();
+    }
+
+    @Transactional
+    public void persistAssistantMessage(UUID conversationId, String content, Object evidence) {
+        conversationJpaRepository.findById(conversationId).ifPresent(c -> {
+            MessageEntity assistantMsg = MessageEntity.builder()
+                .conversation(c)
+                .role(AppConstants.ROLE_ASSISTANT)
+                .content(content)
+                .evidence(evidence instanceof List ? (List) evidence : List.of())
+                .build();
+            messageJpaRepository.save(assistantMsg);
+        });
     }
 
     private ConversationEntity createNewConversation(RepositoryEntity repo, String firstMessage, UserEntity user) {
