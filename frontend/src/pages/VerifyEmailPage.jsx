@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { Cpu, CheckCircle2, AlertCircle, Loader2, ArrowRight, Mail, ArrowLeft } from 'lucide-react';
+import { Cpu, CheckCircle2, AlertCircle, Loader2, ArrowRight, Mail, ArrowLeft, Key } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 
 export default function VerifyEmailPage({ onNavigate }) {
-  const { verifyEmail, resendVerification, user } = useAuth();
-  const [status, setStatus] = useState('VERIFYING'); // 'VERIFYING' | 'SUCCESS' | 'ERROR'
+  const { verifyEmail, resendVerification } = useAuth();
+  const [status, setStatus] = useState('PROMPT'); // 'PROMPT' | 'VERIFYING' | 'SUCCESS' | 'ERROR'
   const [errorMessage, setErrorMessage] = useState('');
+  const [tokenInput, setTokenInput] = useState('');
   const [resendEmail, setResendEmail] = useState('');
   const [resendStatus, setResendStatus] = useState(null);
 
@@ -13,13 +14,19 @@ export default function VerifyEmailPage({ onNavigate }) {
     const params = new URLSearchParams(window.location.search);
     const token = params.get('token');
 
-    if (!token) {
-      setStatus('ERROR');
-      setErrorMessage('No verification token was found in the link.');
-      return;
+    if (token) {
+      setTokenInput(token);
+      performVerification(token);
+    } else {
+      setStatus('PROMPT');
     }
+  }, []);
 
-    verifyEmail(token)
+  const performVerification = (tokenToVerify) => {
+    setStatus('VERIFYING');
+    setErrorMessage('');
+
+    verifyEmail(tokenToVerify)
       .then(() => {
         setStatus('SUCCESS');
       })
@@ -27,7 +34,13 @@ export default function VerifyEmailPage({ onNavigate }) {
         setStatus('ERROR');
         setErrorMessage(err.response?.data?.message || err.message || 'Verification token is invalid or has expired.');
       });
-  }, []);
+  };
+
+  const handleManualSubmit = (e) => {
+    e.preventDefault();
+    if (!tokenInput.trim()) return;
+    performVerification(tokenInput.trim());
+  };
 
   const handleResend = async (e) => {
     e.preventDefault();
@@ -54,6 +67,41 @@ export default function VerifyEmailPage({ onNavigate }) {
       </button>
 
       <div className="w-full max-w-md bg-[#0B1020] border border-surfaceBorder rounded-3xl shadow-2xl p-8 relative z-10 animate-in fade-in zoom-in-95 duration-150 text-center">
+        {status === 'PROMPT' && (
+          <div className="space-y-4">
+            <div className="w-14 h-14 rounded-2xl bg-primary-600/20 border border-primary-500/30 text-primary-400 flex items-center justify-center mx-auto">
+              <Key className="w-7 h-7" />
+            </div>
+            <h1 className="text-xl font-bold text-white">Account Activation</h1>
+            <p className="text-xs text-slate-300 leading-relaxed">
+              Enter your verification token to activate your account.
+            </p>
+
+            <form onSubmit={handleManualSubmit} className="space-y-3 pt-2 text-left">
+              <div>
+                <label className="block text-[11px] font-medium text-slate-400 mb-1">Security Token / Code</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="Paste your activation token"
+                  value={tokenInput}
+                  onChange={(e) => setTokenInput(e.target.value)}
+                  className="w-full bg-surfaceLight border border-surfaceBorder rounded-xl px-3.5 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-primary-500 font-mono"
+                />
+              </div>
+
+              <button
+                type="submit"
+                disabled={!tokenInput.trim()}
+                className="w-full py-3 bg-primary-600 hover:bg-primary-500 disabled:opacity-50 text-white rounded-xl text-xs font-semibold transition shadow-lg shadow-primary-600/25 flex items-center justify-center space-x-1.5"
+              >
+                <span>Verify & Activate Account</span>
+                <ArrowRight className="w-3.5 h-3.5" />
+              </button>
+            </form>
+          </div>
+        )}
+
         {status === 'VERIFYING' && (
           <div className="space-y-4">
             <div className="w-14 h-14 rounded-2xl bg-primary-600/20 border border-primary-500/30 text-primary-400 flex items-center justify-center mx-auto">
