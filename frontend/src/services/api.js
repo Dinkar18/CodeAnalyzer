@@ -85,11 +85,6 @@ export const ChatAPI = {
   // Real-Time Server-Sent Events (SSE) Stream Reader with JWT and Ephemeral BYOK Headers
   streamMessage: async (payload, onToken, onDone, onError) => {
     try {
-      const activeProv = localStorage.getItem('byok_provider') || 'gemini';
-      const customApiKey = localStorage.getItem(`byok_key_${activeProv}`);
-      const customModel = localStorage.getItem(`byok_model_${activeProv}`);
-      const customBaseUrl = localStorage.getItem(`byok_url_${activeProv}`);
-
       const headers = {
         'Content-Type': 'application/json',
         'Accept': 'text/event-stream',
@@ -98,10 +93,10 @@ export const ChatAPI = {
       if (token) {
         headers['Authorization'] = `Bearer ${token}`;
       }
-      if (activeProv) headers['X-LLM-Provider'] = activeProv;
-      if (customApiKey) headers['X-LLM-API-Key'] = customApiKey;
-      if (customModel) headers['X-LLM-Model'] = customModel;
-      if (customBaseUrl) headers['X-LLM-Base-URL'] = customBaseUrl;
+      if (payload.provider) headers['X-LLM-Provider'] = payload.provider;
+      if (payload.custom_api_key) headers['X-LLM-API-Key'] = payload.custom_api_key;
+      if (payload.custom_model) headers['X-LLM-Model'] = payload.custom_model;
+      if (payload.custom_base_url) headers['X-LLM-Base-URL'] = payload.custom_base_url;
 
       const response = await fetch(API_ENDPOINTS.CHAT.STREAM, {
         method: 'POST',
