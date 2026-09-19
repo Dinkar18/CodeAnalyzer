@@ -78,48 +78,30 @@ export const AuthProvider = ({ children }) => {
     return await AuthAPI.resendVerification(email);
   };
 
-  const exchangeOAuthCode = async (provider, code, redirectUri) => {
-    let res;
-    const clientId = localStorage.getItem(`oauth_${provider.toLowerCase()}_client_id`) || '';
-    const clientSecret = localStorage.getItem(`oauth_${provider.toLowerCase()}_client_secret`) || '';
-
-    if (provider === 'GITHUB') {
-      res = await AuthAPI.oauthGithubCallback({ code, redirectUri, clientId, clientSecret });
-    } else if (provider === 'GOOGLE') {
-      res = await AuthAPI.oauthGoogleCallback({ code, redirectUri, clientId, clientSecret });
-    }
-    if (res?.data) {
-      const data = res.data;
-      setToken(data.token);
-      setUser(data.user);
-      localStorage.setItem('architect_jwt_token', data.token);
-      localStorage.setItem('architect_user_profile', JSON.stringify(data.user));
-      return data;
-    }
-  };
-
-  const loginWithOAuth = async (provider, oauthData) => {
-    let res;
-    if (provider === 'GOOGLE') {
-      res = await AuthAPI.oauthGoogle(oauthData);
-    } else if (provider === 'GITHUB') {
-      res = await AuthAPI.oauthGithub(oauthData);
-    }
-    if (res?.data) {
-      const data = res.data;
-      setToken(data.token);
-      setUser(data.user);
-      localStorage.setItem('architect_jwt_token', data.token);
-      localStorage.setItem('architect_user_profile', JSON.stringify(data.user));
-      return data;
-    }
-  };
-
   const logout = () => {
     setUser(null);
     setToken(null);
-    localStorage.removeItem('architect_jwt_token');
-    localStorage.removeItem('architect_user_profile');
+    // Securely clear all tokens, BYOK keys, and cached state
+    try {
+      localStorage.removeItem('architect_jwt_token');
+      localStorage.removeItem('architect_user_profile');
+      
+      // Clean up all user-scoped and global BYOK keys
+      const keysToRemove = [];
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key && (key.startsWith('byok_') || key.startsWith('last_conv_') || key.startsWith('architect_'))) {
+          keysToRemove.push(key);
+        }
+      }
+      keysToRemove.forEach((k) => localStorage.removeItem(k));
+      sessionStorage.clear();
+    } catch (e) {
+      console.warn("Error cleaning storage during logout:", e);
+    }
+
+    // Force redirection to home landing page
+    window.location.href = '/';
   };
 
   return (
@@ -132,8 +114,6 @@ export const AuthProvider = ({ children }) => {
         signup,
         verifyEmail,
         resendVerification,
-        exchangeOAuthCode,
-        loginWithOAuth,
         logout,
         isAuthenticated: !!user
       }}

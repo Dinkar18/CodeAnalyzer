@@ -13,10 +13,13 @@ import AuthModal from '../components/AuthModal';
 import { useAuth } from '../contexts/AuthContext';
 import { RepositoryAPI, FileAPI } from '../services/api';
 import { VIEW_MODES, PROVIDERS } from '../constants/apiEndpoints';
+import { getActiveProvider } from '../utils/byokStorage';
 import { Code2, ShieldAlert, Network, MessageSquare, PanelLeftClose, PanelLeftOpen, PanelRightClose, Sparkles } from 'lucide-react';
 
 export default function WorkspacePage({ onNavigate }) {
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
+  const userId = user?.id || user?.username || 'anon';
+
   const [repositories, setRepositories] = useState([]);
   const [selectedRepo, setSelectedRepo] = useState(null);
   const [isRepoModalOpen, setIsRepoModalOpen] = useState(false);
@@ -24,7 +27,14 @@ export default function WorkspacePage({ onNavigate }) {
   const [isBranchDiffOpen, setIsBranchDiffOpen] = useState(false);
   const [isLLMSettingsOpen, setIsLLMSettingsOpen] = useState(false);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
-  const [activeProvider, setActiveProvider] = useState(() => localStorage.getItem('byok_provider') || PROVIDERS.GEMINI);
+  const [activeProvider, setActiveProvider] = useState(() => getActiveProvider(userId));
+
+  // Redirect to landing page if logged out
+  useEffect(() => {
+    if (!authLoading && !user) {
+      onNavigate('/');
+    }
+  }, [user, authLoading]);
 
   const [files, setFiles] = useState([]);
   const [selectedFile, setSelectedFile] = useState(null);

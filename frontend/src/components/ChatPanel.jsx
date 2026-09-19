@@ -3,6 +3,8 @@ import { Send, Sparkles, Bot, User, FileText, ArrowUpRight, Loader2, Compass, Sh
 import MarkdownRenderer from './MarkdownRenderer';
 import { ChatAPI } from '../services/api';
 import { PROVIDERS } from '../constants/apiEndpoints';
+import { useAuth } from '../contexts/AuthContext';
+import { getActiveProvider, getBYOKKey, getBYOKModel, getBYOKUrl } from '../utils/byokStorage';
 
 export default function ChatPanel({
   repository,
@@ -14,9 +16,12 @@ export default function ChatPanel({
   onClearInitialPrompt = null,
   onOpenLLMSettings = null
 }) {
+  const { user } = useAuth();
+  const userId = user?.id || user?.username || 'anon';
+
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
-  const [provider, setProvider] = useState(() => localStorage.getItem('byok_provider') || PROVIDERS.GEMINI);
+  const [provider, setProvider] = useState(() => getActiveProvider(userId));
   const [conversations, setConversations] = useState([]);
   const [activeConversationId, setActiveConversationId] = useState(null);
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
@@ -164,11 +169,11 @@ export default function ChatPanel({
     if (!customPrompt) setInput('');
     setLoading(true);
 
-    // Read dynamic BYOK settings from localStorage
-    const activeProv = localStorage.getItem('byok_provider') || provider;
-    const customApiKey = localStorage.getItem(`byok_key_${activeProv}`) || null;
-    const customModel = localStorage.getItem(`byok_model_${activeProv}`) || null;
-    const customBaseUrl = localStorage.getItem(`byok_url_${activeProv}`) || null;
+    // Read user-scoped BYOK settings
+    const activeProv = getActiveProvider(userId) || provider;
+    const customApiKey = getBYOKKey(activeProv, userId) || null;
+    const customModel = getBYOKModel(activeProv, null, userId) || null;
+    const customBaseUrl = getBYOKUrl(activeProv, userId) || null;
 
     try {
       await ChatAPI.streamMessage(
