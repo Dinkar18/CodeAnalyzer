@@ -91,14 +91,12 @@ public class AuthService {
         // Dispatch verification email
         emailService.sendVerificationEmail(user.getEmail(), user.getFullName(), verificationToken);
 
-        String token = jwtTokenProvider.generateToken(user.getEmail(), "primary-org", user.getRole());
         return new AuthResponse(
-            token,
-            "Bearer",
-            86400,
+            null,
+            null,
+            0,
             toProfileResponse(user),
-            "Account created! We've sent a verification link to " + user.getEmail(),
-            verificationToken
+            "Account created! We've sent a verification link to " + user.getEmail()
         );
     }
 

@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { Cpu, Lock, Mail, User, Loader2, ArrowRight, CheckCircle2, ArrowLeft, ShieldCheck, Key } from 'lucide-react';
+import { Cpu, Lock, Mail, User, Loader2, ArrowRight, ArrowLeft, Send } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 
 export default function SignUpPage({ onNavigate }) {
-  const { signup, verifyEmail, resendVerification, isAuthenticated } = useAuth();
+  const { signup, resendVerification, isAuthenticated } = useAuth();
   const [email, setEmail] = useState('');
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
@@ -11,12 +11,9 @@ export default function SignUpPage({ onNavigate }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
-  // Verification state
+  // Verification State
   const [registeredEmail, setRegisteredEmail] = useState(null);
-  const [verificationToken, setVerificationToken] = useState('');
-  const [manualToken, setManualToken] = useState('');
-  const [isVerifying, setIsVerifying] = useState(false);
-  const [verifySuccess, setVerifySuccess] = useState(false);
+  const [resendLoading, setResendLoading] = useState(false);
   const [resendStatus, setResendStatus] = useState(null);
 
   useEffect(() => {
@@ -31,11 +28,8 @@ export default function SignUpPage({ onNavigate }) {
     setLoading(true);
 
     try {
-      const res = await signup(email, username, password, fullName);
+      await signup(email, username, password, fullName);
       setRegisteredEmail(email);
-      if (res?.verificationToken) {
-        setVerificationToken(res.verificationToken);
-      }
     } catch (err) {
       setError(err.response?.data?.message || err.message || 'Registration failed');
     } finally {
@@ -43,38 +37,19 @@ export default function SignUpPage({ onNavigate }) {
     }
   };
 
-  const handleActivateAccount = async (tokenToUse) => {
-    const token = tokenToUse || manualToken.trim() || verificationToken;
-    if (!token) {
-      setError('Please provide a verification token or code.');
-      return;
-    }
-
-    setIsVerifying(true);
+  const handleResend = async () => {
+    if (!registeredEmail) return;
+    setResendLoading(true);
+    setResendStatus(null);
     setError(null);
 
     try {
-      await verifyEmail(token);
-      setVerifySuccess(true);
-      setTimeout(() => {
-        onNavigate('/workspace');
-      }, 1000);
-    } catch (err) {
-      setError(err.response?.data?.message || err.message || 'Verification token is invalid or has expired.');
-    } finally {
-      setIsVerifying(false);
-    }
-  };
-
-  const handleResend = async () => {
-    if (!registeredEmail) return;
-    setResendStatus('Resending verification email...');
-    try {
       await resendVerification(registeredEmail);
-      setResendStatus('Verification link resent successfully! Please check your inbox.');
+      setResendStatus('Verification email resent successfully! Please check your inbox.');
     } catch (err) {
       setError(err.response?.data?.message || err.message || 'Failed to resend verification email.');
-      setResendStatus(null);
+    } finally {
+      setResendLoading(false);
     }
   };
 
@@ -97,11 +72,11 @@ export default function SignUpPage({ onNavigate }) {
             <Cpu className="w-6 h-6" />
           </div>
           <h1 className="text-xl font-bold text-white tracking-tight">
-            {registeredEmail ? 'Verify Your Account' : 'Create Developer Account'}
+            {registeredEmail ? 'Verify Your Email' : 'Create Developer Account'}
           </h1>
           <p className="text-xs text-slate-400">
             {registeredEmail
-              ? 'Complete the verification step to activate your workspace'
+              ? 'Activation link dispatched'
               : 'Join the next-generation codebase intelligence platform'}
           </p>
         </div>
@@ -114,98 +89,53 @@ export default function SignUpPage({ onNavigate }) {
 
         {registeredEmail ? (
           <div className="space-y-5 text-center">
-            {verifySuccess ? (
-              <div className="space-y-3 py-4 animate-in zoom-in-50 duration-200">
-                <div className="w-16 h-16 rounded-2xl bg-emerald-500/20 border border-emerald-500/40 text-emerald-400 flex items-center justify-center mx-auto">
-                  <CheckCircle2 className="w-8 h-8" />
-                </div>
-                <h3 className="text-lg font-bold text-white">Account Activated!</h3>
-                <p className="text-xs text-emerald-300">
-                  Launching your AI Codebase Architect workspace...
-                </p>
-              </div>
-            ) : (
-              <>
-                <div className="w-16 h-16 rounded-2xl bg-primary-600/20 border border-primary-500/40 text-primary-400 flex items-center justify-center mx-auto shadow-lg shadow-primary-600/20">
-                  <Mail className="w-8 h-8 animate-pulse" />
-                </div>
+            <div className="w-16 h-16 rounded-2xl bg-primary-600/20 border border-primary-500/40 text-primary-400 flex items-center justify-center mx-auto shadow-lg shadow-primary-600/20">
+              <Mail className="w-8 h-8 animate-pulse" />
+            </div>
 
-                <div className="space-y-1.5">
-                  <h3 className="text-base font-bold text-white">Verification Link Dispatched</h3>
-                  <p className="text-xs text-slate-300 leading-relaxed">
-                    We've sent an activation link to:
-                    <br />
-                    <strong className="text-primary-300 font-mono text-[13px] inline-block mt-1">{registeredEmail}</strong>
-                  </p>
-                </div>
+            <div className="space-y-1.5">
+              <h3 className="text-base font-bold text-white">Check Your Email Inbox</h3>
+              <p className="text-xs text-slate-300 leading-relaxed">
+                We've sent a secure verification link to:
+                <br />
+                <strong className="text-primary-300 font-mono text-[13px] inline-block mt-1">{registeredEmail}</strong>
+              </p>
+            </div>
 
-                {/* 1-Click Instant Activation Card */}
-                {verificationToken && (
-                  <div className="p-4 bg-primary-950/40 border border-primary-500/30 rounded-2xl text-left space-y-2.5">
-                    <div className="flex items-center space-x-2 text-primary-400 text-xs font-semibold">
-                      <ShieldCheck className="w-4 h-4" />
-                      <span>Instant Activation Ready</span>
-                    </div>
-                    <p className="text-[11.5px] text-slate-300 leading-relaxed">
-                      Click below to verify and unlock your workspace immediately:
-                    </p>
-                    <button
-                      onClick={() => handleActivateAccount(verificationToken)}
-                      disabled={isVerifying}
-                      className="w-full py-2.5 bg-primary-600 hover:bg-primary-500 text-white rounded-xl text-xs font-semibold transition shadow-md flex items-center justify-center space-x-2"
-                    >
-                      {isVerifying ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : null}
-                      <span>Activate & Launch Workspace Now</span>
-                      <ArrowRight className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
-                )}
+            <div className="p-4 bg-surfaceLight/60 border border-surfaceBorder rounded-2xl text-left space-y-2 text-xs text-slate-300">
+              <span className="font-bold text-white text-[11px] uppercase tracking-wider block">Verification Required:</span>
+              <p className="text-slate-400 text-[11.5px] leading-relaxed">
+                You must click the link in your email to activate your account before you can sign in.
+              </p>
+              <p className="text-slate-500 text-[10.5px]">
+                (If you don't see the email within 1-2 minutes, please check your Spam / Promotions folder.)
+              </p>
+            </div>
 
-                {/* Manual Token Input Box */}
-                <div className="pt-2 border-t border-surfaceBorder text-left space-y-2">
-                  <label className="text-[11px] font-medium text-slate-400 flex items-center space-x-1">
-                    <Key className="w-3 h-3 text-slate-400" />
-                    <span>Or Enter Security Token manually:</span>
-                  </label>
-                  <div className="flex items-center space-x-2">
-                    <input
-                      type="text"
-                      placeholder="Paste verification token"
-                      value={manualToken}
-                      onChange={(e) => setManualToken(e.target.value)}
-                      className="flex-1 bg-surfaceLight border border-surfaceBorder rounded-xl px-3 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-primary-500 font-mono"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => handleActivateAccount(manualToken)}
-                      disabled={!manualToken.trim() || isVerifying}
-                      className="px-3.5 py-2 bg-surfaceLight hover:bg-surfaceBorder border border-surfaceBorder rounded-xl text-xs font-semibold text-slate-200 hover:text-white transition disabled:opacity-50"
-                    >
-                      Verify
-                    </button>
-                  </div>
-                </div>
-
-                {resendStatus && (
-                  <p className="text-[11px] text-emerald-400 font-medium">{resendStatus}</p>
-                )}
-
-                <div className="pt-2 flex items-center justify-between text-xs text-slate-400">
-                  <button
-                    onClick={handleResend}
-                    className="text-primary-400 hover:underline"
-                  >
-                    Resend Email Link
-                  </button>
-                  <button
-                    onClick={() => onNavigate('/signin')}
-                    className="text-slate-400 hover:text-white"
-                  >
-                    Back to Sign In
-                  </button>
-                </div>
-              </>
+            {resendStatus && (
+              <p className="text-[11.5px] text-emerald-400 font-medium bg-emerald-500/10 border border-emerald-500/30 p-2.5 rounded-xl">
+                {resendStatus}
+              </p>
             )}
+
+            <div className="pt-2 flex flex-col space-y-2.5">
+              <button
+                onClick={() => onNavigate('/signin')}
+                className="w-full py-3 bg-primary-600 hover:bg-primary-500 text-white rounded-xl text-xs font-semibold transition shadow-lg shadow-primary-600/25 flex items-center justify-center space-x-1.5"
+              >
+                <span>Proceed to Sign In</span>
+                <ArrowRight className="w-3.5 h-3.5" />
+              </button>
+
+              <button
+                onClick={handleResend}
+                disabled={resendLoading}
+                className="w-full py-2.5 bg-surfaceLight hover:bg-surfaceBorder border border-surfaceBorder text-slate-300 hover:text-white rounded-xl text-xs font-semibold transition flex items-center justify-center space-x-1.5"
+              >
+                {resendLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
+                <span>Resend Verification Email</span>
+              </button>
+            </div>
           </div>
         ) : (
           <form onSubmit={handleSubmit} className="space-y-3.5">

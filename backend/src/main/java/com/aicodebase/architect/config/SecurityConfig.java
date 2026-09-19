@@ -31,8 +31,8 @@ public class SecurityConfig {
             .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers("/", "/health", "/actuator/**", "/api/auth/**").permitAll()
-                .requestMatchers("/api/**").permitAll() // Development permissive mode with JWT context population
-                .anyRequest().permitAll()
+                .requestMatchers("/api/**").authenticated()
+                .anyRequest().authenticated()
             )
             .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
 
