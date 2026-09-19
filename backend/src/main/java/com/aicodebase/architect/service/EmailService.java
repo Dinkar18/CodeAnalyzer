@@ -34,6 +34,12 @@ public class EmailService {
     @Value("${spring.mail.password:}")
     private String mailPassword;
 
+    @Value("${brevo.api-key:${BREVO_API_KEY:}}")
+    private String brevoApiKey;
+
+    @Value("${resend.api-key:${RESEND_API_KEY:}}")
+    private String resendApiKey;
+
     public void sendVerificationEmail(String recipientEmail, String recipientName, String verificationToken) {
         String verificationUrl = frontendUrl + "/verify-email?token=" + verificationToken;
 
@@ -71,15 +77,25 @@ public class EmailService {
             </html>
             """.formatted(recipientName, verificationUrl, verificationUrl, verificationUrl);
 
-        // 1. If Brevo API Key (xkeysib-...) is detected, use HTTPS REST API over port 443 (Cloud Firewall-Proof)
-        if (mailPassword != null && mailPassword.startsWith("xkeysib-")) {
-            boolean success = sendViaBrevoApi(recipientEmail, recipientName, htmlContent);
-            if (success) {
-                return;
-            }
+        // 1. Check Brevo API Key
+        String activeBrevoKey = !brevoApiKey.isBlank() ? brevoApiKey :
+            (mailPassword != null && (mailPassword.startsWith("xkeysib-") || mailPassword.startsWith("xsmtpsib-"))) ? mailPassword : null;
+
+        if (activeBrevoKey != null) {
+            boolean success = sendViaBrevoApi(activeBrevoKey, recipientEmail, recipientName, htmlContent);
+            if (success) return;
         }
 
-        // 2. Fallback to JavaMailSender (SMTP)
+        // 2. Check Resend API Key
+        String activeResendKey = !resendApiKey.isBlank() ? resendApiKey :
+            (mailPassword != null && mailPassword.startsWith("re_")) ? mailPassword : null;
+
+        if (activeResendKey != null) {
+            boolean success = sendViaResendApi(activeResendKey, recipientEmail, htmlContent);
+            if (success) return;
+        }
+
+        // 3. Fallback to JavaMailSender (SMTP)
         if (mailSender == null) {
             log.info("SMTP JavaMailSender not configured. Email logged to console above.");
             return;
@@ -101,13 +117,13 @@ public class EmailService {
         }
     }
 
-    private boolean sendViaBrevoApi(String recipientEmail, String recipientName, String htmlContent) {
+    private boolean sendViaBrevoApi(String apiKey, String recipientEmail, String recipientName, String htmlContent) {
         try {
             log.info("Dispatching email via Brevo HTTPS REST API (Port 443)...");
             WebClient webClient = webClientBuilder
                 .baseUrl("https://api.brevo.com/v3")
                 .defaultHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
-                .defaultHeader("api-key", mailPassword)
+                .defaultHeader("api-key", apiKey)
                 .build();
 
             Map<String, Object> payload = Map.of(
@@ -135,7 +151,38 @@ public class EmailService {
             log.info("✅ Verification email successfully delivered to {} via Brevo HTTPS API!", recipientEmail);
             return true;
         } catch (Exception e) {
-            log.warn("Brevo HTTPS API delivery failed: {}. Falling back to SMTP...", e.getMessage());
+            log.warn("Brevo HTTPS API delivery failed: {}. Falling back...", e.getMessage());
+            return false;
+        }
+    }
+
+    private boolean sendViaResendApi(String apiKey, String recipientEmail, String htmlContent) {
+        try {
+            log.info("Dispatching email via Resend HTTPS REST API (Port 443)...");
+            WebClient webClient = webClientBuilder
+                .baseUrl("https://api.resend.com")
+                .defaultHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
+                .defaultHeader(HttpHeaders.AUTHORIZATION, "Bearer " + apiKey)
+                .build();
+
+            Map<String, Object> payload = Map.of(
+                "from", "AI Codebase Architect <onboarding@resend.dev>",
+                "to", List.of(recipientEmail),
+                "subject", "Verify your AI Codebase Architect Account",
+                "html", htmlContent
+            );
+
+            webClient.post()
+                .uri("/emails")
+                .bodyValue(payload)
+                .retrieve()
+                .bodyToMono(String.class)
+                .block();
+
+            log.info("✅ Verification email successfully delivered to {} via Resend HTTPS API!", recipientEmail);
+            return true;
+        } catch (Exception e) {
+            log.warn("Resend HTTPS API delivery failed: {}. Falling back...", e.getMessage());
             return false;
         }
     }
