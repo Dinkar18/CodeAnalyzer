@@ -4,29 +4,29 @@
 
 @layer base {
   body {
-    @apply bg-[#070A12] text-slate-100 antialiased overflow-hidden select-none;
+    @apply bg-background text-zinc-100 antialiased overflow-hidden select-none font-sans;
   }
 }
 
-/* Custom sleek scrollbars */
+/* Custom sleek, minimalist scrollbars */
 ::-webkit-scrollbar {
   width: 5px;
   height: 5px;
 }
 ::-webkit-scrollbar-track {
-  background: rgba(15, 23, 42, 0.6);
+  background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: #334155;
+  background: #27272a;
   border-radius: 4px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: #6366F1;
+  background: #3f3f46;
 }
 
 .custom-scrollbar {
   scrollbar-width: thin;
-  scrollbar-color: #334155 rgba(15, 23, 42, 0.6);
+  scrollbar-color: #27272a transparent;
 }
 
 /* Diagram pan-zoom canvas */
