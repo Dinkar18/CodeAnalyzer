@@ -4,7 +4,7 @@
 
 @layer base {
   body {
-    @apply bg-background text-zinc-100 antialiased overflow-hidden select-none font-sans;
+    @apply bg-background text-zinc-100 antialiased min-h-screen overflow-x-hidden overflow-y-auto font-sans;
   }
 }
 
